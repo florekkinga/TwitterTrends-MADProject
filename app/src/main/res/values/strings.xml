@@ -1,3 +1,6 @@
 <resources>
     <string name="app_name">TwitterTrends</string>
+    <string name="recent">Recent searches</string>
+    <string name="find">FIND TRENDS</string>
+    <string name="main_text">Long press on the map to add a marker or search for a specific location to find what Twitter trends are in that place!</string>
 </resources>
