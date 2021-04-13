@@ -1,17 +1,16 @@
 plugins {
     id 'com.android.application'
     id 'kotlin-android'
-    id 'com.google.secrets_gradle_plugin' version '0.5'
 }
 
 android {
-    compileSdkVersion 29
-    buildToolsVersion "29.0.3"
+    compileSdkVersion 30
+    buildToolsVersion "30.0.3"
 
     defaultConfig {
         applicationId "com.wdtm.twittertrends"
         minSdkVersion 24
-        targetSdkVersion 29
+        targetSdkVersion 30
         versionCode 1
         versionName "1.0"
 
