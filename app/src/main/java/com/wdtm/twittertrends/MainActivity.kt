@@ -5,7 +5,9 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.os.Bundle
+import android.os.Looper
 import android.provider.Settings
+import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -13,6 +15,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
+import com.google.android.gms.location.*
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
@@ -20,20 +23,47 @@ import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 
+
 class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
+    /* location permissions */
     private var isLocationPermissionGranted = false
     private val PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 9003
     private val ERROR_DIALOG_REQUEST = 9001
     private val PERMISSIONS_REQUEST_ENABLE_GPS = 9002
 
+    /* buttons */
+    private lateinit var recentSearchesButton : Button
+    private lateinit var findTrendsButton : Button
+
+    /* map */
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private lateinit var locationRequest: LocationRequest
+    private lateinit var locationCallback: LocationCallback
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        recentSearchesButton = findViewById(R.id.recentButton)
+        findTrendsButton = findViewById(R.id.findButton)
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        locationRequest = createLocationRequest()
+
+        recentSearchesButton.setOnClickListener { showRecentSearches() }
+        findTrendsButton.setOnClickListener { showTrends() }
+
         val mapFragment = supportFragmentManager
                 .findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
+    }
+
+    private fun showTrends() {
+        TODO("Not yet implemented")
+    }
+
+    private fun showRecentSearches() {
+        TODO("Not yet implemented")
     }
 
     override fun onMapReady(googleMap: GoogleMap) {
@@ -45,6 +75,45 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         )
         googleMap.moveCamera(CameraUpdateFactory.newLatLng(sydney))
         googleMap.mapType = GoogleMap.MAP_TYPE_HYBRID
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED
+                && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            getLocationPermission()
+            return
+        }
+        googleMap.isMyLocationEnabled = true
+
+        requestLocationUpdates()
+    }
+
+    private fun requestLocationUpdates() {
+        locationCallback = object : LocationCallback() {
+            override fun onLocationResult(locationResult: LocationResult?) {
+                locationResult ?: return
+                for (location in locationResult.locations){
+                    // Update UI with location data
+                    // ...
+                }
+            }
+        }
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED
+                && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            getLocationPermission()
+            return
+        }
+        fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
+    }
+
+    private fun createLocationRequest(): LocationRequest {
+        return LocationRequest.create().apply {
+            interval = 10000
+            fastestInterval = 5000
+            priority = LocationRequest.PRIORITY_HIGH_ACCURACY
+        }
     }
 
     override fun onResume() {
