@@ -3,6 +3,7 @@ package com.wdtm.twittertrends
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.location.LocationManager
 import android.os.Bundle
 import android.os.Looper
@@ -18,9 +19,12 @@ import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.location.*
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
+import com.google.android.gms.maps.GoogleMap.OnMapLongClickListener
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
+import com.google.android.gms.maps.model.CircleOptions
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 
 
@@ -40,6 +44,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationRequest: LocationRequest
     private lateinit var locationCallback: LocationCallback
+    private lateinit var marker: Marker
+    private var isMarker : Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,13 +73,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     override fun onMapReady(googleMap: GoogleMap) {
-        val sydney = LatLng(-34.0, 151.0)
-        googleMap.addMarker(
-                MarkerOptions()
-                        .position(sydney)
-                        .title("Marker in Sydney")
-        )
-        googleMap.moveCamera(CameraUpdateFactory.newLatLng(sydney))
         googleMap.mapType = GoogleMap.MAP_TYPE_HYBRID
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
@@ -86,6 +85,25 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         googleMap.isMyLocationEnabled = true
 
         requestLocationUpdates()
+        setMapListener(googleMap)
+    }
+
+    private fun setMapListener(googleMap: GoogleMap) {
+        googleMap.setOnMapLongClickListener(OnMapLongClickListener { latLng ->
+            if (!isMarker) {
+                isMarker = true
+            } else {
+                marker.remove()
+            }
+            marker = googleMap.addMarker(MarkerOptions()
+                    .position(latLng)
+                    .draggable(true)
+                    .title("title")
+                    .snippet("snippet")
+                    .visible(true))
+            marker.tag = "tag"
+            marker.showInfoWindow()
+        })
     }
 
     private fun requestLocationUpdates() {
