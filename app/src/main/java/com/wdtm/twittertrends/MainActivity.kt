@@ -8,6 +8,7 @@ import android.location.LocationManager
 import android.os.Bundle
 import android.os.Looper
 import android.provider.Settings
+import android.util.Log
 import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -26,6 +27,7 @@ import com.google.android.gms.maps.model.CircleOptions
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
+import com.wdtm.twittertrends.api.TwitterAPI
 
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback {
@@ -50,6 +52,26 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        TwitterAPI.init(this)
+
+        TwitterAPI.fetchLocation("37.7821120598956", "-122.400612831116", { data ->
+            Log.d("WORKS", data.toString())
+        }, {
+            Log.d("UPSI", ":(")
+        })
+
+        TwitterAPI.fetchTrends("1", { data ->
+            Log.d("WORKS", data.toString())
+        }, {
+            Log.d("UPSI", ":(")
+        })
+
+        TwitterAPI.fetchQuery("37.7821120598956", "-122.400612831116", { data ->
+            Log.d("WORKS", data.toString())
+        }, {
+            Log.d("UPSI", ":(")
+        })
 
         recentSearchesButton = findViewById(R.id.recentButton)
         findTrendsButton = findViewById(R.id.findButton)
@@ -95,14 +117,34 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             } else {
                 marker.remove()
             }
+
             marker = googleMap.addMarker(MarkerOptions()
-                    .position(latLng)
-                    .draggable(true)
-                    .title("title")
-                    .snippet("snippet")
-                    .visible(true))
+                .position(latLng)
+                .draggable(true)
+                .title("?")
+                .snippet("snippet")
+                .visible(true))
             marker.tag = "tag"
             marker.showInfoWindow()
+
+            TwitterAPI.fetchLocation(latLng.latitude.toString(), latLng.longitude.toString(), {
+                if (!isMarker) {
+                    isMarker = true
+                } else {
+                    marker.remove()
+                }
+
+                marker = googleMap.addMarker(MarkerOptions().position(latLng)
+                    .draggable(true)
+                    .title(it.name)
+                    .snippet("snippet - TODO")
+                    .visible(true))
+
+                marker.tag = "tag"
+                marker.showInfoWindow()
+            }, {
+                // TODO: Handle error case
+            })
         })
     }
 
@@ -111,8 +153,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             override fun onLocationResult(locationResult: LocationResult?) {
                 locationResult ?: return
                 for (location in locationResult.locations){
-                    // Update UI with location data
-                    // ...
+                    // TODO: Update UI with location data
                 }
             }
         }
