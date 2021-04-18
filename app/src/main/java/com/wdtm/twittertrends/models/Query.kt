@@ -1,4 +1,4 @@
-package com.wdtm.twittertrends.api.models
+package com.wdtm.twittertrends.models
 
 import java.util.*
 
