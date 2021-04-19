@@ -31,7 +31,9 @@ import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import com.wdtm.twittertrends.api.TwitterAPI
 import com.wdtm.twittertrends.db.QueryHistory
+import com.wdtm.twittertrends.models.Query
 import com.wdtm.twittertrends.models.Trend
+import com.wdtm.twittertrends.ui.RecentSearchesFragment
 import com.wdtm.twittertrends.ui.TrendsFragment
 import java.io.IOException
 
@@ -68,27 +70,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         TwitterAPI.init(this)
         QueryHistory.init(this)
 
-        TwitterAPI.fetchLocation("37.7821120598956", "-122.400612831116", { data ->
-            Log.d("WORKS", data.toString())
-        }, {
-            Log.d("UPSI", ":(")
-        })
-
-        TwitterAPI.fetchTrends("1", { data ->
-            Log.d("WORKS", data.toString())
-        }, {
-            Log.d("UPSI", ":(")
-        })
-
-        TwitterAPI.fetchQuery("68.7821120598956", "96.400612831116", { data ->
-            QueryHistory.add(data)
-        }, {
-            Log.d("UPSI", ":(")
-        })
-
-        // QueryHistory.clear()
-        QueryHistory.getAll({ data -> data.forEach { Log.d("LOADED FROM DB", it.toString()) } }, {})
-        QueryHistory.getFirst(1, { data -> data.forEach { Log.d("LOADED FIRST ELEMENT FROM DB", it.toString()) } }, {})
+//        QueryHistory.clear()
 
         recentSearchesButton = findViewById(R.id.recentButton)
         findTrendsButton = findViewById(R.id.findButton)
@@ -101,7 +83,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         findTrendsButton.setOnClickListener { showTrends() }
 
         val mapFragment = supportFragmentManager
-                .findFragmentById(R.id.map) as SupportMapFragment
+            .findFragmentById(R.id.map) as SupportMapFragment
 
         searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String): Boolean {
@@ -123,15 +105,16 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     override fun onMapReady(googleMap: GoogleMap) {
         map = googleMap
         map.mapType = GoogleMap.MAP_TYPE_HYBRID
-        map.setPadding(0,150, 0, 0)
+        map.setPadding(0, 150, 0, 0)
         map.uiSettings.isZoomControlsEnabled = true
         map.uiSettings.isZoomGesturesEnabled = true
         map.uiSettings.isCompassEnabled = true
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED
-                && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
+            != PackageManager.PERMISSION_GRANTED
+            && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
             getLocationPermission()
             return
         }
@@ -159,25 +142,29 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int,
-                                            permissions: Array<String?>,
-                                            grantResults: IntArray) {
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String?>,
+        grantResults: IntArray
+    ) {
         isLocationPermissionGranted = false
         if (requestCode == PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION) {
             // If request is cancelled, the result arrays are empty.
             if (grantResults.isNotEmpty()
-                && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED
+            ) {
                 isLocationPermissionGranted = true
             }
         }
     }
 
     private fun addMarker(
-            position: LatLng,
-            title: String = "",
-            tag: String = "tag",
-            draggable: Boolean = true,
-            visible: Boolean = true) {
+        position: LatLng,
+        title: String = "",
+        tag: String = "tag",
+        draggable: Boolean = true,
+        visible: Boolean = true
+    ) {
 
         TwitterAPI.fetchLocation(position.latitude.toString(), position.longitude.toString(), {
             if (!isMarker) {
@@ -186,11 +173,13 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 marker.remove()
             }
 
-            marker = map.addMarker(MarkerOptions()
-                .position(position)
-                .draggable(draggable)
-                .title(it.name)
-                .visible(visible))
+            marker = map.addMarker(
+                MarkerOptions()
+                    .position(position)
+                    .draggable(draggable)
+                    .title(it.name)
+                    .visible(visible)
+            )
             marker.tag = tag
             marker.showInfoWindow()
             map.animateCamera(CameraUpdateFactory.newLatLngZoom(position, 10f))
@@ -218,29 +207,42 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun showTrends() {
-        val fm: FragmentManager = supportFragmentManager
         val trendsFragment = TrendsFragment.newInstance()
         var trends: Array<Trend> = arrayOf()
-        if(isMarker) {
+        if (isMarker) {
             TwitterAPI.fetchLocation(marker.position, { data ->
                 TwitterAPI.fetchTrends(data.id, { trendsList ->
                     trends = trendsList.toTypedArray()
                     trendsFragment.loadTrends(trends)
-                    trendsFragment.show(fm, "trends_fragment")
+                    trendsFragment.show(supportFragmentManager, "trends_fragment")
+                }, {
+                    // TODO: Handle error case
+                })
+
+                TwitterAPI.fetchQuery(marker.position, { query ->
+                    QueryHistory.add(query)
                 }, {
                     // TODO: Handle error case
                 })
             }, {
                 // TODO: Handle error case
             })
-        }
-        else{
+        } else {
             Toast.makeText(this, "Add marker to the map", Toast.LENGTH_SHORT).show()
         }
     }
 
     private fun showRecentSearches() {
-        TODO("Not yet implemented")
+        val recentSearchesFragment = RecentSearchesFragment.newInstance()
+        var recentSearches: Array<Query> = arrayOf()
+        QueryHistory.getAll({ data ->
+            recentSearches = data.toTypedArray()
+            recentSearchesFragment.loadSearchHistory(recentSearches)
+            recentSearchesFragment.show(supportFragmentManager, "recent searches fragment")
+        }, {
+            // TODO: Handle error case
+        })
+
     }
 
     private fun setMapListener() {
@@ -259,13 +261,18 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             }
         }
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED
-                && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
+            != PackageManager.PERMISSION_GRANTED
+            && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
             getLocationPermission()
             return
         }
-        fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
+        fusedLocationClient.requestLocationUpdates(
+            locationRequest,
+            locationCallback,
+            Looper.getMainLooper()
+        )
     }
 
     private fun createLocationRequest(): LocationRequest {
@@ -298,25 +305,27 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private fun buildAlertMessageNoGps() {
         val builder = AlertDialog.Builder(this)
         builder.setMessage("This application requires GPS to work properly, do you want to enable it?")
-                .setCancelable(false)
-                .setPositiveButton("Yes") { dialog, id ->
-                    val enableGpsIntent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
-                    startActivityForResult(enableGpsIntent, PERMISSIONS_REQUEST_ENABLE_GPS)
-                }
+            .setCancelable(false)
+            .setPositiveButton("Yes") { dialog, id ->
+                val enableGpsIntent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+                startActivityForResult(enableGpsIntent, PERMISSIONS_REQUEST_ENABLE_GPS)
+            }
         val alert = builder.create()
         alert.show()
     }
 
     private fun isServicesOK(): Boolean {
 
-        val available = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(this@MainActivity)
+        val available =
+            GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(this@MainActivity)
 
         when {
             available == ConnectionResult.SUCCESS -> {
                 return true
             }
             GoogleApiAvailability.getInstance().isUserResolvableError(available) -> {
-                val dialog = GoogleApiAvailability.getInstance().getErrorDialog(this@MainActivity, available, ERROR_DIALOG_REQUEST)
+                val dialog = GoogleApiAvailability.getInstance()
+                    .getErrorDialog(this@MainActivity, available, ERROR_DIALOG_REQUEST)
                 dialog.show()
             }
             else -> {
@@ -328,15 +337,17 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private fun getLocationPermission() {
         if (ContextCompat.checkSelfPermission(
-                        this.applicationContext,
-                        Manifest.permission.ACCESS_FINE_LOCATION
-                ) == PackageManager.PERMISSION_GRANTED) {
+                this.applicationContext,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
             isLocationPermissionGranted = true
         } else {
             ActivityCompat.requestPermissions(
-                    this,
-                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
-                    PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION)
+                this,
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION
+            )
         }
     }
 }

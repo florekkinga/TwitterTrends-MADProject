@@ -13,11 +13,12 @@ import com.wdtm.twittertrends.R
 import com.wdtm.twittertrends.models.Trend
 
 
-class TrendsListAdapter(var dataSet: Array<Trend>) : RecyclerView.Adapter<TrendsListAdapter.ViewHolder>()  {
+class TrendsListAdapter(var dataSet: Array<Trend>) :
+    RecyclerView.Adapter<TrendsListAdapter.ViewHolder>() {
 
     private lateinit var context: Context
 
-    class ViewHolder(view: View) : RecyclerView.ViewHolder(view){
+    class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val trendTextView: TextView = view.findViewById(R.id.trendTextView)
     }
 
@@ -39,7 +40,7 @@ class TrendsListAdapter(var dataSet: Array<Trend>) : RecyclerView.Adapter<Trends
         context.startActivity(browserIntent)
     }
 
-    fun setContext(context: Context){
+    fun setContext(context: Context) {
         this.context = context
     }
 

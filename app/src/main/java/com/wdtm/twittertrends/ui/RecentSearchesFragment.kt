@@ -8,34 +8,34 @@ import androidx.fragment.app.DialogFragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.wdtm.twittertrends.R
-import com.wdtm.twittertrends.models.Trend
+import com.wdtm.twittertrends.models.Query
 
-class TrendsFragment : DialogFragment() {
+class RecentSearchesFragment : DialogFragment() {
 
-    private lateinit var trendsRecyclerView: RecyclerView
-    private var dataSet: Array<Trend> = arrayOf<Trend>()
-    private var adapter: TrendsListAdapter = TrendsListAdapter(dataSet)
+    private lateinit var recyclerView: RecyclerView
+    private var dataSet: Array<Query> = arrayOf<Query>()
+    private var adapter: RecentSearchesListAdapter = RecentSearchesListAdapter(dataSet)
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
         val view = inflater.inflate(R.layout.fragment_dialog, container)
-        trendsRecyclerView = view.findViewById(R.id.recyclerView)
-        trendsRecyclerView.layoutManager = LinearLayoutManager(context)
+        recyclerView = view.findViewById(R.id.recyclerView)
+        recyclerView.layoutManager = LinearLayoutManager(context)
         context?.let { adapter.setContext(it) }
-        trendsRecyclerView.adapter = adapter
+        recyclerView.adapter = adapter
         return view
     }
 
-    fun loadTrends(trends: Array<Trend>) {
-        adapter.dataSet = trends
+    fun loadSearchHistory(recentSearches: Array<Query>) {
+        adapter.dataSet = recentSearches
         adapter.notifyDataSetChanged()
     }
 
     companion object {
-        fun newInstance(): TrendsFragment {
-            val frag = TrendsFragment()
+        fun newInstance(): RecentSearchesFragment {
+            val frag = RecentSearchesFragment()
             val args = Bundle()
             frag.arguments = args
             return frag
