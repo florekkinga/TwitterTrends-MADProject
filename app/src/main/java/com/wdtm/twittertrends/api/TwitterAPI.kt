@@ -1,6 +1,7 @@
 package com.wdtm.twittertrends.api
 
 import android.content.Context
+import com.google.android.gms.maps.model.LatLng
 import com.google.gson.GsonBuilder
 import com.wdtm.twittertrends.R
 import com.wdtm.twittertrends.api.deserializers.LocationDeserializer
@@ -8,6 +9,9 @@ import com.wdtm.twittertrends.api.deserializers.TrendsDeserializer
 import com.wdtm.twittertrends.api.endpoints.GetLocation
 import com.wdtm.twittertrends.api.endpoints.GetTrends
 import com.wdtm.twittertrends.api.models.*
+import com.wdtm.twittertrends.models.Location
+import com.wdtm.twittertrends.models.Query
+import com.wdtm.twittertrends.models.Trend
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import retrofit2.Call
@@ -31,6 +35,10 @@ object TwitterAPI {
             .build()
     }
 
+    fun fetchQuery(coordinates: LatLng, onSuccess: (data: Query) -> Unit, onFailure: () -> Unit) {
+        fetchQuery(coordinates.latitude.toString(), coordinates.longitude.toString(), onSuccess, onFailure)
+    }
+
     fun fetchQuery(latitude: String, longitude: String, onSuccess: (data: Query) -> Unit, onFailure: () -> Unit) {
         if (context == null) {
             onFailure()
@@ -46,6 +54,10 @@ object TwitterAPI {
         }, {
             onFailure()
         })
+    }
+
+    fun fetchLocation(coordinates: LatLng, onSuccess: (data: Location) -> Unit, onFailure: () -> Unit) {
+        fetchLocation(coordinates.latitude.toString(), coordinates.longitude.toString(), onSuccess, onFailure)
     }
 
     fun fetchLocation(latitude: String, longitude: String, onSuccess: (data: Location) -> Unit, onFailure: () -> Unit) {
@@ -116,5 +128,4 @@ object TwitterAPI {
             chain.proceed(newRequest)
         }.build()
     }
-
 }

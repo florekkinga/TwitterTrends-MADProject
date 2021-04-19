@@ -3,7 +3,6 @@ package com.wdtm.twittertrends
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Color
 import android.location.LocationManager
 import android.os.Bundle
 import android.os.Looper
@@ -18,16 +17,14 @@ import androidx.core.content.ContextCompat
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.location.*
-import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.GoogleMap.OnMapLongClickListener
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
-import com.google.android.gms.maps.model.CircleOptions
-import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import com.wdtm.twittertrends.api.TwitterAPI
+import com.wdtm.twittertrends.db.QueryHistory
 
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback {
@@ -54,6 +51,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         setContentView(R.layout.activity_main)
 
         TwitterAPI.init(this)
+        QueryHistory.init(this)
 
         TwitterAPI.fetchLocation("37.7821120598956", "-122.400612831116", { data ->
             Log.d("WORKS", data.toString())
@@ -67,11 +65,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             Log.d("UPSI", ":(")
         })
 
-        TwitterAPI.fetchQuery("37.7821120598956", "-122.400612831116", { data ->
-            Log.d("WORKS", data.toString())
+        TwitterAPI.fetchQuery("68.7821120598956", "96.400612831116", { data ->
+            QueryHistory.add(data)
         }, {
             Log.d("UPSI", ":(")
         })
+
+        // QueryHistory.clear()
+        QueryHistory.getAll( { data -> data.forEach { Log.d("LOADED FROM DB", it.toString()) }  }, {})
+        QueryHistory.getFirst(1, { data -> data.forEach { Log.d("LOADED FIRST ELEMENT FROM DB", it.toString()) }  }, {})
 
         recentSearchesButton = findViewById(R.id.recentButton)
         findTrendsButton = findViewById(R.id.findButton)
