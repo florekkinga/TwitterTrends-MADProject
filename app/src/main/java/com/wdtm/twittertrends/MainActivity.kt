@@ -3,6 +3,8 @@ package com.wdtm.twittertrends
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.location.Address
+import android.location.Geocoder
 import android.location.LocationManager
 import android.os.Bundle
 import android.os.Looper
@@ -12,21 +14,26 @@ import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.SearchView;
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentManager
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.location.*
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.GoogleMap.OnMapLongClickListener
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
+import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import com.wdtm.twittertrends.api.TwitterAPI
 import com.wdtm.twittertrends.db.QueryHistory
 import com.wdtm.twittertrends.ui.TrendsFragment
+import java.io.IOException
+
 
 // TODO: Extract MapFragment to another class
 
@@ -39,15 +46,19 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private val PERMISSIONS_REQUEST_ENABLE_GPS = 9002
 
     /* buttons */
-    private lateinit var recentSearchesButton : Button
-    private lateinit var findTrendsButton : Button
+    private lateinit var recentSearchesButton: Button
+    private lateinit var findTrendsButton: Button
 
     /* map */
+    private lateinit var map: GoogleMap
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationRequest: LocationRequest
     private lateinit var locationCallback: LocationCallback
     private lateinit var marker: Marker
-    private var isMarker : Boolean = false
+    private var isMarker: Boolean = false
+
+    /* search */
+    private lateinit var searchView: SearchView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -80,6 +91,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
         recentSearchesButton = findViewById(R.id.recentButton)
         findTrendsButton = findViewById(R.id.findButton)
+        searchView = findViewById(R.id.idSearchView)
+
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         locationRequest = createLocationRequest()
 
@@ -88,20 +101,26 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
         val mapFragment = supportFragmentManager
                 .findFragmentById(R.id.map) as SupportMapFragment
+
+        searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String): Boolean {
+                val location = searchView.query.toString()
+                var addressList: List<Address>? = null
+                if (location != "") {
+                    addMarkedInFoundLocation(addressList, location)
+                }
+                return false
+            }
+
+            override fun onQueryTextChange(newText: String): Boolean {
+                return false
+            }
+        })
         mapFragment.getMapAsync(this)
     }
 
-    private fun showTrends() {
-        val fm: FragmentManager = supportFragmentManager
-        val editNameDialogFragment: TrendsFragment = TrendsFragment.newInstance("Some Title")
-        editNameDialogFragment.show(fm, "fragment_edit_name")
-    }
-
-    private fun showRecentSearches() {
-        TODO("Not yet implemented")
-    }
-
     override fun onMapReady(googleMap: GoogleMap) {
+        map = googleMap
         googleMap.mapType = GoogleMap.MAP_TYPE_HYBRID
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
@@ -114,72 +133,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         googleMap.isMyLocationEnabled = true
 
         requestLocationUpdates()
-        setMapListener(googleMap)
-    }
-
-    private fun setMapListener(googleMap: GoogleMap) {
-        googleMap.setOnMapLongClickListener(OnMapLongClickListener { latLng ->
-            if (!isMarker) {
-                isMarker = true
-            } else {
-                marker.remove()
-            }
-
-            marker = googleMap.addMarker(MarkerOptions()
-                    .position(latLng)
-                    .draggable(true)
-                    .title("?")
-                    .snippet("snippet")
-                    .visible(true))
-            marker.tag = "tag"
-            marker.showInfoWindow()
-
-            TwitterAPI.fetchLocation(latLng.latitude.toString(), latLng.longitude.toString(), {
-                if (!isMarker) {
-                    isMarker = true
-                } else {
-                    marker.remove()
-                }
-
-                marker = googleMap.addMarker(MarkerOptions().position(latLng)
-                        .draggable(true)
-                        .title(it.name)
-                        .snippet("snippet - TODO")
-                        .visible(true))
-
-                marker.tag = "tag"
-                marker.showInfoWindow()
-            }, {
-                // TODO: Handle error case
-            })
-        })
-    }
-
-    private fun requestLocationUpdates() {
-        locationCallback = object : LocationCallback() {
-            override fun onLocationResult(locationResult: LocationResult?) {
-                locationResult ?: return
-                for (location in locationResult.locations){
-                    // TODO: Update UI with location data
-                }
-            }
-        }
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED
-                && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
-            getLocationPermission()
-            return
-        }
-        fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
-    }
-
-    private fun createLocationRequest(): LocationRequest {
-        return LocationRequest.create().apply {
-            interval = 10000
-            fastestInterval = 5000
-            priority = LocationRequest.PRIORITY_HIGH_ACCURACY
-        }
+        setMapListener()
     }
 
     override fun onResume() {
@@ -207,9 +161,99 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         if (requestCode == PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION) {
             // If request is cancelled, the result arrays are empty.
             if (grantResults.isNotEmpty()
-                    && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 isLocationPermissionGranted = true
             }
+        }
+    }
+
+    private fun addMarker(
+            position: LatLng,
+            title: String = "",
+            tag: String = "tag",
+            draggable: Boolean = true,
+            visible: Boolean = true) {
+
+        TwitterAPI.fetchLocation(position.latitude.toString(), position.longitude.toString(), {
+            if (!isMarker) {
+                isMarker = true
+            } else {
+                marker.remove()
+            }
+
+            marker = map.addMarker(MarkerOptions()
+                .position(position)
+                .draggable(draggable)
+                .title(it.name)
+                .visible(visible))
+            marker.tag = tag
+            marker.showInfoWindow()
+            map.animateCamera(CameraUpdateFactory.newLatLngZoom(position, 10f))
+        }, {
+            // TODO: Handle error case
+        })
+    }
+
+    private fun addMarkedInFoundLocation(
+        addressList: List<Address>?,
+        location: String
+    ) {
+        var addressList1 = addressList
+        val geocoder = Geocoder(this@MainActivity)
+        try {
+            addressList1 = geocoder.getFromLocationName(location, 1)
+        } catch (e: IOException) {
+            e.printStackTrace()
+        }
+        if (!addressList1.isNullOrEmpty()) {
+            val address: Address = addressList1[0]
+            val latLng = LatLng(address.latitude, address.longitude)
+
+//            addMarker(latLng, location, "")
+            addMarker(latLng)
+        }
+    }
+
+    private fun showTrends() {
+        val fm: FragmentManager = supportFragmentManager
+        val editNameDialogFragment: TrendsFragment = TrendsFragment.newInstance("Some Title")
+        editNameDialogFragment.show(fm, "fragment_edit_name")
+    }
+
+    private fun showRecentSearches() {
+        TODO("Not yet implemented")
+    }
+
+    private fun setMapListener() {
+        map.setOnMapLongClickListener(OnMapLongClickListener { latLng ->
+            addMarker(latLng)
+        })
+    }
+
+    private fun requestLocationUpdates() {
+        locationCallback = object : LocationCallback() {
+            override fun onLocationResult(locationResult: LocationResult?) {
+                locationResult ?: return
+//                for (location in locationResult.locations) {
+//                    // TODO: Update UI with location data
+//                }
+            }
+        }
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED
+                && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            getLocationPermission()
+            return
+        }
+        fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
+    }
+
+    private fun createLocationRequest(): LocationRequest {
+        return LocationRequest.create().apply {
+            interval = 10000
+            fastestInterval = 5000
+            priority = LocationRequest.PRIORITY_HIGH_ACCURACY
         }
     }
 
