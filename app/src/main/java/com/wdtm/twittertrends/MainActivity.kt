@@ -31,6 +31,7 @@ import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import com.wdtm.twittertrends.api.TwitterAPI
 import com.wdtm.twittertrends.db.QueryHistory
+import com.wdtm.twittertrends.models.Trend
 import com.wdtm.twittertrends.ui.TrendsFragment
 import java.io.IOException
 
@@ -123,6 +124,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         map = googleMap
         map.mapType = GoogleMap.MAP_TYPE_HYBRID
         map.setPadding(0,150, 0, 0)
+        map.uiSettings.isZoomControlsEnabled = true
+        map.uiSettings.isZoomGesturesEnabled = true
+        map.uiSettings.isCompassEnabled = true
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED
@@ -215,8 +219,24 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private fun showTrends() {
         val fm: FragmentManager = supportFragmentManager
-        val editNameDialogFragment: TrendsFragment = TrendsFragment.newInstance("Some Title")
-        editNameDialogFragment.show(fm, "fragment_edit_name")
+        val trendsFragment = TrendsFragment.newInstance()
+        var trends: Array<Trend> = arrayOf()
+        if(isMarker) {
+            TwitterAPI.fetchLocation(marker.position, { data ->
+                TwitterAPI.fetchTrends(data.id, { trendsList ->
+                    trends = trendsList.toTypedArray()
+                    trendsFragment.loadTrends(trends)
+                    trendsFragment.show(fm, "trends_fragment")
+                }, {
+                    // TODO: Handle error case
+                })
+            }, {
+                // TODO: Handle error case
+            })
+        }
+        else{
+            Toast.makeText(this, "Add marker to the map", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun showRecentSearches() {
