@@ -105,7 +105,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String): Boolean {
                 val location = searchView.query.toString()
-                var addressList: List<Address>? = null
+                val addressList: List<Address>? = null
                 if (location != "") {
                     addMarkedInFoundLocation(addressList, location)
                 }
@@ -121,7 +121,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     override fun onMapReady(googleMap: GoogleMap) {
         map = googleMap
-        googleMap.mapType = GoogleMap.MAP_TYPE_HYBRID
+        map.mapType = GoogleMap.MAP_TYPE_HYBRID
+        map.setPadding(0,150, 0, 0)
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED
@@ -208,8 +209,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         if (!addressList1.isNullOrEmpty()) {
             val address: Address = addressList1[0]
             val latLng = LatLng(address.latitude, address.longitude)
-
-//            addMarker(latLng, location, "")
             addMarker(latLng)
         }
     }

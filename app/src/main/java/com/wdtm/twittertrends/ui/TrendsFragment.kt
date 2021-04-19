@@ -4,8 +4,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.view.WindowManager
-import android.widget.EditText
 import androidx.annotation.Nullable
 import androidx.fragment.app.DialogFragment
 import com.wdtm.twittertrends.R
