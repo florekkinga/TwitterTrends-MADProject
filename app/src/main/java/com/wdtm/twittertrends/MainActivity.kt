@@ -14,6 +14,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentManager
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.location.*
@@ -25,7 +26,9 @@ import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import com.wdtm.twittertrends.api.TwitterAPI
 import com.wdtm.twittertrends.db.QueryHistory
+import com.wdtm.twittertrends.ui.TrendsFragment
 
+// TODO: Extract MapFragment to another class
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
@@ -72,8 +75,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         })
 
         // QueryHistory.clear()
-        QueryHistory.getAll( { data -> data.forEach { Log.d("LOADED FROM DB", it.toString()) }  }, {})
-        QueryHistory.getFirst(1, { data -> data.forEach { Log.d("LOADED FIRST ELEMENT FROM DB", it.toString()) }  }, {})
+        QueryHistory.getAll({ data -> data.forEach { Log.d("LOADED FROM DB", it.toString()) } }, {})
+        QueryHistory.getFirst(1, { data -> data.forEach { Log.d("LOADED FIRST ELEMENT FROM DB", it.toString()) } }, {})
 
         recentSearchesButton = findViewById(R.id.recentButton)
         findTrendsButton = findViewById(R.id.findButton)
@@ -89,7 +92,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun showTrends() {
-        TODO("Not yet implemented")
+        val fm: FragmentManager = supportFragmentManager
+        val editNameDialogFragment: TrendsFragment = TrendsFragment.newInstance("Some Title")
+        editNameDialogFragment.show(fm, "fragment_edit_name")
     }
 
     private fun showRecentSearches() {
@@ -121,11 +126,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             }
 
             marker = googleMap.addMarker(MarkerOptions()
-                .position(latLng)
-                .draggable(true)
-                .title("?")
-                .snippet("snippet")
-                .visible(true))
+                    .position(latLng)
+                    .draggable(true)
+                    .title("?")
+                    .snippet("snippet")
+                    .visible(true))
             marker.tag = "tag"
             marker.showInfoWindow()
 
@@ -137,10 +142,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 }
 
                 marker = googleMap.addMarker(MarkerOptions().position(latLng)
-                    .draggable(true)
-                    .title(it.name)
-                    .snippet("snippet - TODO")
-                    .visible(true))
+                        .draggable(true)
+                        .title(it.name)
+                        .snippet("snippet - TODO")
+                        .visible(true))
 
                 marker.tag = "tag"
                 marker.showInfoWindow()
