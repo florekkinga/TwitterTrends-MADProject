@@ -6,4 +6,6 @@
 
     <string name="twitter_api_url">https://api.twitter.com/</string>
     <string name="twitter_api_token">AAAAAAAAAAAAAAAAAAAAAM4cOAEAAAAAlNJyQzDavNbXYJD7bjzpW5c5eFM%3Douc2YoUh9aqUuOI9VH9kWGCih5plG8kzHCf1arVzRzisM1v3Tg</string>
+    <string name="latLang">%.4f, %.4f</string>
+    <string name="clear">Clear search history</string>
 </resources>
