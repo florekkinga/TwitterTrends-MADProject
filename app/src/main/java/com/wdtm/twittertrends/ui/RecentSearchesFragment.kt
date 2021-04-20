@@ -1,9 +1,12 @@
 package com.wdtm.twittertrends.ui
 
+import android.content.Context
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
 import androidx.fragment.app.DialogFragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -13,8 +16,8 @@ import com.wdtm.twittertrends.models.Query
 class RecentSearchesFragment : DialogFragment() {
 
     private lateinit var recyclerView: RecyclerView
-    private var dataSet: Array<Query> = arrayOf<Query>()
-    private var adapter: RecentSearchesListAdapter = RecentSearchesListAdapter(dataSet)
+    private var dataSet: Array<Query> = arrayOf()
+    private var adapter: RecentSearchesListAdapter = RecentSearchesListAdapter(dataSet, this)
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -27,6 +30,7 @@ class RecentSearchesFragment : DialogFragment() {
         recyclerView.adapter = adapter
         return view
     }
+
 
     fun loadSearchHistory(recentSearches: Array<Query>) {
         adapter.dataSet = recentSearches

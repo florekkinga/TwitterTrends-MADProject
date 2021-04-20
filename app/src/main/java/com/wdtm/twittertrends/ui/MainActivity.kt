@@ -1,4 +1,4 @@
-package com.wdtm.twittertrends
+package com.wdtm.twittertrends.ui
 
 import android.Manifest
 import android.content.Intent
@@ -10,6 +10,9 @@ import android.os.Bundle
 import android.os.Looper
 import android.provider.Settings
 import android.util.Log
+import android.view.Menu
+import android.view.MenuInflater
+import android.view.MenuItem
 import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -17,7 +20,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView;
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.fragment.app.FragmentManager
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.location.*
@@ -29,13 +31,13 @@ import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
+import com.wdtm.twittertrends.R
 import com.wdtm.twittertrends.api.TwitterAPI
 import com.wdtm.twittertrends.db.QueryHistory
 import com.wdtm.twittertrends.models.Query
 import com.wdtm.twittertrends.models.Trend
-import com.wdtm.twittertrends.ui.RecentSearchesFragment
-import com.wdtm.twittertrends.ui.TrendsFragment
 import java.io.IOException
+import kotlin.math.log
 
 
 // TODO: Extract MapFragment to another class
@@ -70,17 +72,14 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         TwitterAPI.init(this)
         QueryHistory.init(this)
 
-//        QueryHistory.clear()
-
         recentSearchesButton = findViewById(R.id.recentButton)
         findTrendsButton = findViewById(R.id.findButton)
         searchView = findViewById(R.id.idSearchView)
+        recentSearchesButton.setOnClickListener { showRecentSearches() }
+        findTrendsButton.setOnClickListener { showTrends() }
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         locationRequest = createLocationRequest()
-
-        recentSearchesButton.setOnClickListener { showRecentSearches() }
-        findTrendsButton.setOnClickListener { showTrends() }
 
         val mapFragment = supportFragmentManager
             .findFragmentById(R.id.map) as SupportMapFragment
@@ -124,6 +123,22 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         setMapListener()
     }
 
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        val inflater: MenuInflater = menuInflater
+        inflater.inflate(R.menu.main_menu, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.clear -> {
+                clearHistory()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         if (checkMapServices()) {
@@ -158,7 +173,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-    private fun addMarker(
+    fun addMarker(
         position: LatLng,
         title: String = "",
         tag: String = "tag",
@@ -172,10 +187,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             } else {
                 marker.remove()
             }
-
+            val snippet = "%.4f, %.4f".format(position.latitude, position.longitude)
             marker = map.addMarker(
                 MarkerOptions()
                     .position(position)
+                    .snippet(snippet)
                     .draggable(draggable)
                     .title(it.name)
                     .visible(visible)
@@ -208,7 +224,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private fun showTrends() {
         val trendsFragment = TrendsFragment.newInstance()
-        var trends: Array<Trend> = arrayOf()
+        var trends: Array<Trend>
         if (isMarker) {
             TwitterAPI.fetchLocation(marker.position, { data ->
                 TwitterAPI.fetchTrends(data.id, { trendsList ->
@@ -232,17 +248,31 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
+    fun showRecentTrends(trendsList: List<Trend>){
+        val trendsFragment = TrendsFragment.newInstance()
+        val trends = trendsList.toTypedArray()
+        trendsFragment.loadTrends(trends)
+        trendsFragment.show(supportFragmentManager, "trends_fragment")
+    }
+
+    private fun clearHistory(){
+        QueryHistory.clear()
+    }
+
     private fun showRecentSearches() {
         val recentSearchesFragment = RecentSearchesFragment.newInstance()
         var recentSearches: Array<Query> = arrayOf()
         QueryHistory.getAll({ data ->
             recentSearches = data.toTypedArray()
-            recentSearchesFragment.loadSearchHistory(recentSearches)
-            recentSearchesFragment.show(supportFragmentManager, "recent searches fragment")
+            recentSearches.distinctBy { it.location.name }
+            recentSearches.sortByDescending { it.date }
+            if(recentSearches.isNotEmpty()) {
+                recentSearchesFragment.loadSearchHistory(recentSearches)
+                recentSearchesFragment.show(supportFragmentManager, "recent searches fragment")
+            }
         }, {
             // TODO: Handle error case
         })
-
     }
 
     private fun setMapListener() {
@@ -326,7 +356,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             GoogleApiAvailability.getInstance().isUserResolvableError(available) -> {
                 val dialog = GoogleApiAvailability.getInstance()
                     .getErrorDialog(this@MainActivity, available, ERROR_DIALOG_REQUEST)
-                dialog.show()
+                dialog?.show()
             }
             else -> {
                 Toast.makeText(this, "You can't make map requests", Toast.LENGTH_SHORT).show()
