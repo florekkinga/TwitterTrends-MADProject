@@ -41,7 +41,8 @@ import io.reactivex.schedulers.Schedulers
 import java.io.IOException
 
 
-// TODO: Extract MapFragment to another class
+// Emil Sroka, Kinga Florek
+// grupa czwartek 09:30
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
