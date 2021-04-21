@@ -1,6 +1,7 @@
 package com.wdtm.twittertrends.ui
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Address
@@ -44,8 +45,6 @@ import kotlin.math.log
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
-    /* location permissions */
-    private var isLocationPermissionGranted = false
     private val PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 9003
     private val ERROR_DIALOG_REQUEST = 9001
     private val PERMISSIONS_REQUEST_ENABLE_GPS = 9002
@@ -61,6 +60,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var locationCallback: LocationCallback
     private lateinit var marker: Marker
     private var isMarker: Boolean = false
+    private var isMapLoaded: Boolean = false
 
     /* search */
     private lateinit var searchView: SearchView
@@ -87,9 +87,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String): Boolean {
                 val location = searchView.query.toString()
-                val addressList: List<Address>? = null
                 if (location != "") {
-                    addMarkedInFoundLocation(addressList, location)
+                    addMarkedInFoundLocation(location)
                 }
                 return false
             }
@@ -108,19 +107,17 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         map.uiSettings.isZoomControlsEnabled = true
         map.uiSettings.isZoomGesturesEnabled = true
         map.uiSettings.isCompassEnabled = true
+        isMapLoaded = true
+        setMapListener()
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-            != PackageManager.PERMISSION_GRANTED
-            && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
             != PackageManager.PERMISSION_GRANTED
         ) {
             getLocationPermission()
             return
         }
-        googleMap.isMyLocationEnabled = true
-
+        map.isMyLocationEnabled = true
         requestLocationUpdates()
-        setMapListener()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -132,7 +129,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.clear -> {
-                clearHistory()
+                QueryHistory.clear()
                 true
             }
             else -> super.onOptionsItemSelected(item)
@@ -141,41 +138,30 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     override fun onResume() {
         super.onResume()
-        if (checkMapServices()) {
-            if (!isLocationPermissionGranted) {
-                getLocationPermission()
-            }
-        }
+        checkMapServices()
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == PERMISSIONS_REQUEST_ENABLE_GPS) {
-            if (!isLocationPermissionGranted) {
-                getLocationPermission()
-            }
-        }
-    }
-
+    @SuppressLint("MissingPermission")
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<String?>,
         grantResults: IntArray
     ) {
-        isLocationPermissionGranted = false
         if (requestCode == PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION) {
-            // If request is cancelled, the result arrays are empty.
             if (grantResults.isNotEmpty()
                 && grantResults[0] == PackageManager.PERMISSION_GRANTED
             ) {
-                isLocationPermissionGranted = true
+                if (isMapLoaded) {
+                    map.isMyLocationEnabled = true
+                    requestLocationUpdates()
+                    setMapListener()
+                }
             }
         }
     }
 
     fun addMarker(
         position: LatLng,
-        title: String = "",
         tag: String = "tag",
         draggable: Boolean = true,
         visible: Boolean = true
@@ -204,19 +190,16 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         })
     }
 
-    private fun addMarkedInFoundLocation(
-        addressList: List<Address>?,
-        location: String
-    ) {
-        var addressList1 = addressList
+    private fun addMarkedInFoundLocation(location: String) {
+        var addressList: List<Address>? = null
         val geocoder = Geocoder(this@MainActivity)
         try {
-            addressList1 = geocoder.getFromLocationName(location, 1)
+            addressList = geocoder.getFromLocationName(location, 1)
         } catch (e: IOException) {
             e.printStackTrace()
         }
-        if (!addressList1.isNullOrEmpty()) {
-            val address: Address = addressList1[0]
+        if (!addressList.isNullOrEmpty()) {
+            val address: Address = addressList[0]
             val latLng = LatLng(address.latitude, address.longitude)
             addMarker(latLng)
         }
@@ -226,20 +209,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         val trendsFragment = TrendsFragment.newInstance()
         var trends: Array<Trend>
         if (isMarker) {
-            TwitterAPI.fetchLocation(marker.position, { data ->
-                TwitterAPI.fetchTrends(data.id, { trendsList ->
-                    trends = trendsList.toTypedArray()
-                    trendsFragment.loadTrends(trends)
-                    trendsFragment.show(supportFragmentManager, "trends_fragment")
-                }, {
-                    // TODO: Handle error case
-                })
-
-                TwitterAPI.fetchQuery(marker.position, { query ->
-                    QueryHistory.add(query)
-                }, {
-                    // TODO: Handle error case
-                })
+            TwitterAPI.fetchQuery(marker.position, { query ->
+                QueryHistory.add(query)
+                trends = query.trends.toTypedArray()
+                trendsFragment.loadTrends(trends)
+                trendsFragment.show(supportFragmentManager, "trends_fragment")
             }, {
                 // TODO: Handle error case
             })
@@ -248,25 +222,20 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-    fun showRecentTrends(trendsList: List<Trend>){
+    fun showRecentTrends(trendsList: List<Trend>) {
         val trendsFragment = TrendsFragment.newInstance()
         val trends = trendsList.toTypedArray()
         trendsFragment.loadTrends(trends)
         trendsFragment.show(supportFragmentManager, "trends_fragment")
     }
 
-    private fun clearHistory(){
-        QueryHistory.clear()
-    }
-
     private fun showRecentSearches() {
-        val recentSearchesFragment = RecentSearchesFragment.newInstance()
-        var recentSearches: Array<Query> = arrayOf()
         QueryHistory.getAll({ data ->
-            recentSearches = data.toTypedArray()
+            val recentSearchesFragment = RecentSearchesFragment.newInstance()
+            val recentSearches: Array<Query> = data.toTypedArray()
             recentSearches.distinctBy { it.location.name }
             recentSearches.sortByDescending { it.date }
-            if(recentSearches.isNotEmpty()) {
+            if (recentSearches.isNotEmpty()) {
                 recentSearchesFragment.loadSearchHistory(recentSearches)
                 recentSearchesFragment.show(supportFragmentManager, "recent searches fragment")
             }
@@ -276,26 +245,18 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun setMapListener() {
-        map.setOnMapLongClickListener(OnMapLongClickListener { latLng ->
-            addMarker(latLng)
-        })
+        map.setOnMapLongClickListener { latLng -> addMarker(latLng) }
     }
 
     private fun requestLocationUpdates() {
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(locationResult: LocationResult?) {
                 locationResult ?: return
-//                for (location in locationResult.locations) {
-//                    // TODO: Update UI with location data
-//                }
             }
         }
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
             != PackageManager.PERMISSION_GRANTED
-            && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
-            != PackageManager.PERMISSION_GRANTED
         ) {
-            getLocationPermission()
             return
         }
         fusedLocationClient.requestLocationUpdates(
@@ -371,7 +332,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 Manifest.permission.ACCESS_FINE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
         ) {
-            isLocationPermissionGranted = true
+            if (isMapLoaded) {
+                map.isMyLocationEnabled = true
+                requestLocationUpdates()
+                setMapListener()
+            }
         } else {
             ActivityCompat.requestPermissions(
                 this,
