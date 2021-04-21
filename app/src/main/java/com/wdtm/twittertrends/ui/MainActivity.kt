@@ -10,7 +10,6 @@ import android.location.LocationManager
 import android.os.Bundle
 import android.os.Looper
 import android.provider.Settings
-import android.util.Log
 import android.view.Menu
 import android.view.MenuInflater
 import android.view.MenuItem
@@ -18,15 +17,15 @@ import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.SearchView;
+import androidx.appcompat.widget.SearchView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.github.pwittchen.reactivenetwork.library.rx2.ReactiveNetwork
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.location.*
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
-import com.google.android.gms.maps.GoogleMap.OnMapLongClickListener
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
@@ -37,8 +36,9 @@ import com.wdtm.twittertrends.api.TwitterAPI
 import com.wdtm.twittertrends.db.QueryHistory
 import com.wdtm.twittertrends.models.Query
 import com.wdtm.twittertrends.models.Trend
+import io.reactivex.android.schedulers.AndroidSchedulers
+import io.reactivex.schedulers.Schedulers
 import java.io.IOException
-import kotlin.math.log
 
 
 // TODO: Extract MapFragment to another class
@@ -83,6 +83,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
         val mapFragment = supportFragmentManager
             .findFragmentById(R.id.map) as SupportMapFragment
+
+        checkInternetConnection()
 
         searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String): Boolean {
@@ -186,7 +188,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             marker.showInfoWindow()
             map.animateCamera(CameraUpdateFactory.newLatLngZoom(position, 10f))
         }, {
-            // TODO: Handle error case
+            showToastOnUiThread("ERROR!", false)
         })
     }
 
@@ -215,7 +217,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 trendsFragment.loadTrends(trends)
                 trendsFragment.show(supportFragmentManager, "trends_fragment")
             }, {
-                // TODO: Handle error case
+                showToastOnUiThread("ERROR!", false)
             })
         } else {
             Toast.makeText(this, "Add marker to the map", Toast.LENGTH_SHORT).show()
@@ -238,9 +240,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             if (recentSearches.isNotEmpty()) {
                 recentSearchesFragment.loadSearchHistory(recentSearches)
                 recentSearchesFragment.show(supportFragmentManager, "recent searches fragment")
+            } else {
+                showToastOnUiThread("Your search history is empty", false)
             }
         }, {
-            // TODO: Handle error case
+            showToastOnUiThread("ERROR!", false)
         })
     }
 
@@ -297,7 +301,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         val builder = AlertDialog.Builder(this)
         builder.setMessage("This application requires GPS to work properly, do you want to enable it?")
             .setCancelable(false)
-            .setPositiveButton("Yes") { dialog, id ->
+            .setPositiveButton("Yes") { _, _ ->
                 val enableGpsIntent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
                 startActivityForResult(enableGpsIntent, PERMISSIONS_REQUEST_ENABLE_GPS)
             }
@@ -343,6 +347,32 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
                 PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION
             )
+        }
+    }
+
+    @SuppressLint("CheckResult")
+    private fun checkInternetConnection() {
+        ReactiveNetwork
+            .observeInternetConnectivity()
+            .subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe { isConnectedToInternet: Boolean ->
+                if (isConnectedToInternet) {
+                    showToastOnUiThread("Connected!")
+                } else {
+                    showToastOnUiThread("Please check your internet connection")
+                }
+            }
+    }
+
+    private fun showToastOnUiThread(text: String, long: Boolean = true) {
+        val length = if (long) {
+            Toast.LENGTH_LONG
+        } else {
+            Toast.LENGTH_SHORT
+        }
+        this@MainActivity.runOnUiThread {
+            Toast.makeText(this, text, length).show()
         }
     }
 }

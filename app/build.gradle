@@ -35,6 +35,7 @@ android {
 dependencies {
     apply plugin: "kotlin-kapt"
     implementation "androidx.room:room-runtime:2.2.6"
+    implementation 'com.github.pwittchen:reactivenetwork-rx2:3.0.2'
     kapt "androidx.room:room-compiler:2.2.6"
     implementation 'com.google.code.gson:gson:2.8.6'
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'
