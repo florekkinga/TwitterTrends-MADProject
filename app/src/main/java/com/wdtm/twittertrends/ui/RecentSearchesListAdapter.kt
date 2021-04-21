@@ -53,7 +53,7 @@ class RecentSearchesListAdapter(var dataSet: Array<Query>, private val dialogFra
     @SuppressLint("RestrictedApi")
     private fun searchTrends(trends: List<Trend>) {
         dialogFragment.dismiss()
-        (getActivity(context) as MainActivity).showRecentTrends(trends)
+        (getActivity(context) as MainActivity).createDialogWithTrends(trends)
     }
 
     fun setContext(context: Context) {

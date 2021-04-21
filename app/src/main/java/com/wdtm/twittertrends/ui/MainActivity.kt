@@ -1,6 +1,7 @@
 package com.wdtm.twittertrends.ui
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Address
@@ -9,7 +10,6 @@ import android.location.LocationManager
 import android.os.Bundle
 import android.os.Looper
 import android.provider.Settings
-import android.util.Log
 import android.view.Menu
 import android.view.MenuInflater
 import android.view.MenuItem
@@ -17,15 +17,15 @@ import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.SearchView;
+import androidx.appcompat.widget.SearchView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.github.pwittchen.reactivenetwork.library.rx2.ReactiveNetwork
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.location.*
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
-import com.google.android.gms.maps.GoogleMap.OnMapLongClickListener
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
@@ -36,16 +36,15 @@ import com.wdtm.twittertrends.api.TwitterAPI
 import com.wdtm.twittertrends.db.QueryHistory
 import com.wdtm.twittertrends.models.Query
 import com.wdtm.twittertrends.models.Trend
+import io.reactivex.android.schedulers.AndroidSchedulers
+import io.reactivex.schedulers.Schedulers
 import java.io.IOException
-import kotlin.math.log
 
 
 // TODO: Extract MapFragment to another class
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
-    /* location permissions */
-    private var isLocationPermissionGranted = false
     private val PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 9003
     private val ERROR_DIALOG_REQUEST = 9001
     private val PERMISSIONS_REQUEST_ENABLE_GPS = 9002
@@ -61,6 +60,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var locationCallback: LocationCallback
     private lateinit var marker: Marker
     private var isMarker: Boolean = false
+    private var isMapLoaded: Boolean = false
 
     /* search */
     private lateinit var searchView: SearchView
@@ -84,12 +84,13 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         val mapFragment = supportFragmentManager
             .findFragmentById(R.id.map) as SupportMapFragment
 
+        checkInternetConnection()
+
         searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String): Boolean {
                 val location = searchView.query.toString()
-                val addressList: List<Address>? = null
                 if (location != "") {
-                    addMarkedInFoundLocation(addressList, location)
+                    addMarkedInFoundLocation(location)
                 }
                 return false
             }
@@ -108,19 +109,17 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         map.uiSettings.isZoomControlsEnabled = true
         map.uiSettings.isZoomGesturesEnabled = true
         map.uiSettings.isCompassEnabled = true
+        isMapLoaded = true
+        setMapListener()
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-            != PackageManager.PERMISSION_GRANTED
-            && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
             != PackageManager.PERMISSION_GRANTED
         ) {
             getLocationPermission()
             return
         }
-        googleMap.isMyLocationEnabled = true
-
+        map.isMyLocationEnabled = true
         requestLocationUpdates()
-        setMapListener()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -132,7 +131,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.clear -> {
-                clearHistory()
+                QueryHistory.clear()
                 true
             }
             else -> super.onOptionsItemSelected(item)
@@ -141,41 +140,30 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     override fun onResume() {
         super.onResume()
-        if (checkMapServices()) {
-            if (!isLocationPermissionGranted) {
-                getLocationPermission()
-            }
-        }
+        checkMapServices()
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == PERMISSIONS_REQUEST_ENABLE_GPS) {
-            if (!isLocationPermissionGranted) {
-                getLocationPermission()
-            }
-        }
-    }
-
+    @SuppressLint("MissingPermission")
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<String?>,
         grantResults: IntArray
     ) {
-        isLocationPermissionGranted = false
         if (requestCode == PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION) {
-            // If request is cancelled, the result arrays are empty.
             if (grantResults.isNotEmpty()
                 && grantResults[0] == PackageManager.PERMISSION_GRANTED
             ) {
-                isLocationPermissionGranted = true
+                if (isMapLoaded) {
+                    map.isMyLocationEnabled = true
+                    requestLocationUpdates()
+                    setMapListener()
+                }
             }
         }
     }
 
     fun addMarker(
         position: LatLng,
-        title: String = "",
         tag: String = "tag",
         draggable: Boolean = true,
         visible: Boolean = true
@@ -200,102 +188,80 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             marker.showInfoWindow()
             map.animateCamera(CameraUpdateFactory.newLatLngZoom(position, 10f))
         }, {
-            // TODO: Handle error case
+            showToastOnUiThread("ERROR!", false)
         })
     }
 
-    private fun addMarkedInFoundLocation(
-        addressList: List<Address>?,
-        location: String
-    ) {
-        var addressList1 = addressList
+    private fun addMarkedInFoundLocation(location: String) {
+        var addressList: List<Address>? = null
         val geocoder = Geocoder(this@MainActivity)
         try {
-            addressList1 = geocoder.getFromLocationName(location, 1)
+            addressList = geocoder.getFromLocationName(location, 1)
         } catch (e: IOException) {
             e.printStackTrace()
         }
-        if (!addressList1.isNullOrEmpty()) {
-            val address: Address = addressList1[0]
+        if (!addressList.isNullOrEmpty()) {
+            val address: Address = addressList[0]
             val latLng = LatLng(address.latitude, address.longitude)
             addMarker(latLng)
         }
     }
 
     private fun showTrends() {
-        val trendsFragment = TrendsFragment.newInstance()
-        var trends: Array<Trend>
         if (isMarker) {
-            TwitterAPI.fetchLocation(marker.position, { data ->
-                TwitterAPI.fetchTrends(data.id, { trendsList ->
-                    trends = trendsList.toTypedArray()
-                    trendsFragment.loadTrends(trends)
-                    trendsFragment.show(supportFragmentManager, "trends_fragment")
-                }, {
-                    // TODO: Handle error case
-                })
-
-                TwitterAPI.fetchQuery(marker.position, { query ->
-                    QueryHistory.add(query)
-                }, {
-                    // TODO: Handle error case
-                })
+            TwitterAPI.fetchQuery(marker.position, { query ->
+                QueryHistory.add(query)
+                createDialogWithTrends(query.trends)
             }, {
-                // TODO: Handle error case
+                showToastOnUiThread("ERROR!", false)
             })
         } else {
             Toast.makeText(this, "Add marker to the map", Toast.LENGTH_SHORT).show()
         }
     }
 
-    fun showRecentTrends(trendsList: List<Trend>){
+    fun createDialogWithTrends(trendsList: List<Trend>) {
         val trendsFragment = TrendsFragment.newInstance()
         val trends = trendsList.toTypedArray()
-        trendsFragment.loadTrends(trends)
-        trendsFragment.show(supportFragmentManager, "trends_fragment")
-    }
-
-    private fun clearHistory(){
-        QueryHistory.clear()
+        if(trends.isNotEmpty()){
+            trendsFragment.loadTrends(trends)
+            trendsFragment.show(supportFragmentManager, "trends_fragment")
+        }
+        else{
+            showToastOnUiThread("Nothing trendy here", false)
+        }
     }
 
     private fun showRecentSearches() {
-        val recentSearchesFragment = RecentSearchesFragment.newInstance()
-        var recentSearches: Array<Query> = arrayOf()
         QueryHistory.getAll({ data ->
-            recentSearches = data.toTypedArray()
+            val recentSearchesFragment = RecentSearchesFragment.newInstance()
+            val recentSearches: Array<Query> = data.toTypedArray()
             recentSearches.distinctBy { it.location.name }
             recentSearches.sortByDescending { it.date }
-            if(recentSearches.isNotEmpty()) {
+            if (recentSearches.isNotEmpty()) {
                 recentSearchesFragment.loadSearchHistory(recentSearches)
                 recentSearchesFragment.show(supportFragmentManager, "recent searches fragment")
+            } else {
+                showToastOnUiThread("Your search history is empty", false)
             }
         }, {
-            // TODO: Handle error case
+            showToastOnUiThread("ERROR!", false)
         })
     }
 
     private fun setMapListener() {
-        map.setOnMapLongClickListener(OnMapLongClickListener { latLng ->
-            addMarker(latLng)
-        })
+        map.setOnMapLongClickListener { latLng -> addMarker(latLng) }
     }
 
     private fun requestLocationUpdates() {
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(locationResult: LocationResult?) {
                 locationResult ?: return
-//                for (location in locationResult.locations) {
-//                    // TODO: Update UI with location data
-//                }
             }
         }
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
             != PackageManager.PERMISSION_GRANTED
-            && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
-            != PackageManager.PERMISSION_GRANTED
         ) {
-            getLocationPermission()
             return
         }
         fusedLocationClient.requestLocationUpdates(
@@ -336,7 +302,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         val builder = AlertDialog.Builder(this)
         builder.setMessage("This application requires GPS to work properly, do you want to enable it?")
             .setCancelable(false)
-            .setPositiveButton("Yes") { dialog, id ->
+            .setPositiveButton("Yes") { _, _ ->
                 val enableGpsIntent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
                 startActivityForResult(enableGpsIntent, PERMISSIONS_REQUEST_ENABLE_GPS)
             }
@@ -371,13 +337,43 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 Manifest.permission.ACCESS_FINE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
         ) {
-            isLocationPermissionGranted = true
+            if (isMapLoaded) {
+                map.isMyLocationEnabled = true
+                requestLocationUpdates()
+                setMapListener()
+            }
         } else {
             ActivityCompat.requestPermissions(
                 this,
                 arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
                 PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION
             )
+        }
+    }
+
+    @SuppressLint("CheckResult")
+    private fun checkInternetConnection() {
+        ReactiveNetwork
+            .observeInternetConnectivity()
+            .subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe { isConnectedToInternet: Boolean ->
+                if (isConnectedToInternet) {
+                    showToastOnUiThread("Connected!")
+                } else {
+                    showToastOnUiThread("Please check your internet connection")
+                }
+            }
+    }
+
+    private fun showToastOnUiThread(text: String, long: Boolean = true) {
+        val length = if (long) {
+            Toast.LENGTH_LONG
+        } else {
+            Toast.LENGTH_SHORT
+        }
+        this@MainActivity.runOnUiThread {
+            Toast.makeText(this, text, length).show()
         }
     }
 }
