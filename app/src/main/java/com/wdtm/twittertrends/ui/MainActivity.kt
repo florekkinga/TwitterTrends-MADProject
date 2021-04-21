@@ -208,14 +208,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun showTrends() {
-        val trendsFragment = TrendsFragment.newInstance()
-        var trends: Array<Trend>
         if (isMarker) {
             TwitterAPI.fetchQuery(marker.position, { query ->
                 QueryHistory.add(query)
-                trends = query.trends.toTypedArray()
-                trendsFragment.loadTrends(trends)
-                trendsFragment.show(supportFragmentManager, "trends_fragment")
+                createDialogWithTrends(query.trends)
             }, {
                 showToastOnUiThread("ERROR!", false)
             })
@@ -224,11 +220,16 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-    fun showRecentTrends(trendsList: List<Trend>) {
+    fun createDialogWithTrends(trendsList: List<Trend>) {
         val trendsFragment = TrendsFragment.newInstance()
         val trends = trendsList.toTypedArray()
-        trendsFragment.loadTrends(trends)
-        trendsFragment.show(supportFragmentManager, "trends_fragment")
+        if(trends.isNotEmpty()){
+            trendsFragment.loadTrends(trends)
+            trendsFragment.show(supportFragmentManager, "trends_fragment")
+        }
+        else{
+            showToastOnUiThread("Nothing trendy here", false)
+        }
     }
 
     private fun showRecentSearches() {
