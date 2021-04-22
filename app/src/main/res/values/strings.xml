@@ -5,7 +5,7 @@
     <string name="main_text">Long press on the map to add a marker or search for a specific location to find what Twitter trends are in that place!</string>
 
     <string name="twitter_api_url">https://api.twitter.com/</string>
-    <string name="twitter_api_token">AAAAAAAAAAAAAAAAAAAAAM4cOAEAAAAAlNJyQzDavNbXYJD7bjzpW5c5eFM%3Douc2YoUh9aqUuOI9VH9kWGCih5plG8kzHCf1arVzRzisM1v3Tg</string>
+    <string name="twitter_api_token">YOUR API KEY</string>
     <string name="latLang">%.4f, %.4f</string>
     <string name="clear">Clear search history</string>
 </resources>
